@@ -467,7 +467,8 @@ handle_uevent (GUdevClient *client,
     /* A bit paranoid */
     subsys = g_udev_device_get_subsystem (device);
     g_return_if_fail (subsys != NULL);
-    g_return_if_fail (g_str_equal (subsys, "tty") || g_str_equal (subsys, "net") || g_str_has_prefix (subsys, "usb"));
+    g_return_if_fail (g_str_equal (subsys, "tty") || g_str_equal (subsys, "net") ||
+                      g_str_has_prefix (subsys, "usb") || g_str_equal (subsys, "rpmsg"));
 
     kernel_device = mm_kernel_device_udev_new (device);
 
@@ -558,6 +559,13 @@ process_scan (MMBaseManager *self,
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
             start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
+        g_object_unref (G_OBJECT (iter->data));
+    }
+    g_list_free (devices);
+
+    devices = g_udev_client_query_by_subsystem (self->priv->udev, "rpmsg");
+    for (iter = devices; iter; iter = g_list_next (iter)) {
+        start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -1448,7 +1456,7 @@ mm_base_manager_init (MMBaseManager *self)
 
 #if defined WITH_UDEV
     {
-        const gchar *subsys[5] = { "tty", "net", "usb", "usbmisc", NULL };
+        const gchar *subsys[] = { "tty", "net", "usb", "usbmisc", "rpmsg", NULL };
 
         /* Setup UDev client */
         self->priv->udev = g_udev_client_new (subsys);

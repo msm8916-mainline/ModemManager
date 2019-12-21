@@ -47,7 +47,7 @@ struct _MMPortQmiClass {
 GType mm_port_qmi_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortQmi, g_object_unref)
 
-MMPortQmi *mm_port_qmi_new (const gchar *name);
+MMPortQmi *mm_port_qmi_new (const gchar *name, MMPortSubsys subsys);
 
 void     mm_port_qmi_open         (MMPortQmi            *self,
                                    gboolean              set_data_format,

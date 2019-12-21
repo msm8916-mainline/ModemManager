@@ -788,11 +788,14 @@ mm_port_qmi_close (MMPortQmi           *self,
 /*****************************************************************************/
 
 MMPortQmi *
-mm_port_qmi_new (const gchar *name)
+mm_port_qmi_new (const gchar *name, MMPortSubsys subsys)
 {
+    g_return_val_if_fail (subsys == MM_PORT_SUBSYS_USB ||
+                          subsys == MM_PORT_SUBSYS_RPMSG, NULL);
+
     return MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
                                       MM_PORT_DEVICE, name,
-                                      MM_PORT_SUBSYS, MM_PORT_SUBSYS_USB,
+                                      MM_PORT_SUBSYS, subsys,
                                       MM_PORT_TYPE, MM_PORT_TYPE_QMI,
                                       NULL));
 }

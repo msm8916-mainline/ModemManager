@@ -9122,7 +9122,17 @@ initialization_started (MMBroadbandModem *self,
 
     /* Now open our QMI port */
     mm_port_qmi_open (ctx->qmi,
-                      TRUE,
+                      /* FIXME: Parts of the "data format" functionality on libqmi
+                       * assume that we are talking to qmi_wwan, which exposes the
+                       * kernel data format through sysfs.
+                       *
+                       * For RPMSG modems the driver that manages the net port
+                       * is a different one, and setting the kernel data format
+                       * therefore eventually works differently there.
+                       * For now skip setting the data format entirely for RPMSG
+                       * to avoid a Segmentation Fault.
+                       */
+                      mm_port_get_subsys (MM_PORT (ctx->qmi)) != MM_PORT_SUBSYS_RPMSG,
                       NULL,
                       (GAsyncReadyCallback)qmi_port_open_ready,
                       task);

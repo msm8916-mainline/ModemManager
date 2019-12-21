@@ -773,6 +773,12 @@ mm_plugin_supports_port (MMPlugin            *self,
 
     /* Build flags depending on what probing needed */
     probe_run_flags = MM_PORT_PROBE_NONE;
+    if (g_str_equal (mm_kernel_device_get_subsystem (port), "rpmsg")) {
+        if (self->priv->at)
+            probe_run_flags |= MM_PORT_PROBE_AT;
+        if (self->priv->qmi)
+            probe_run_flags |= MM_PORT_PROBE_QMI;
+    } else
     if (!g_str_has_prefix (mm_kernel_device_get_name (port), "cdc-wdm")) {
         /* Serial ports... */
         if (self->priv->at)
@@ -958,6 +964,18 @@ mm_plugin_create_modem (MMPlugin  *self,
             }
 
 #if defined WITH_QMI
+/* FIXME: For RPMSG modems the network interface usually won't be managed
+ * by the USB qmi_wwan driver so the check below prevents them from getting
+ * registered in ModemManager.
+ *
+ * I guess it should be just skipped in the RPMSG case. However, to detect that
+ * it seems like we would need to iterate another time over "port_probes"
+ * to see if the QMI port is provided by the RPMSG subsystem.
+ *
+ * I'm not sure if there is a simple way to detect this situation only based
+ * on the network device itself (which has nothing to do with RPMSG).
+ */
+#if 0
             if (MM_IS_BROADBAND_MODEM_QMI (modem) &&
                 port_type == MM_PORT_TYPE_NET &&
                 g_strcmp0 (driver, "qmi_wwan") != 0) {
@@ -966,6 +984,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                 force_ignored = TRUE;
                 goto grab_port;
             }
+#endif
 
             if (!MM_IS_BROADBAND_MODEM_QMI (modem) &&
                 port_type == MM_PORT_TYPE_NET &&

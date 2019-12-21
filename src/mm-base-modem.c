@@ -175,6 +175,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     if (!g_str_equal (subsys, "net") &&
         !g_str_equal (subsys, "tty") &&
         !(g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm")) &&
+        !g_str_equal (subsys, "rpmsg") &&
         !g_str_equal (subsys, "virtual")) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -297,7 +298,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
              g_str_has_prefix (name, "cdc-wdm")) {
 #if defined WITH_QMI
         if (ptype == MM_PORT_TYPE_QMI)
-            port = MM_PORT (mm_port_qmi_new (name));
+            port = MM_PORT (mm_port_qmi_new (name, MM_PORT_SUBSYS_USB));
 #endif
 #if defined WITH_MBIM
         if (!port && ptype == MM_PORT_TYPE_MBIM)
@@ -339,6 +340,35 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                                                mm_serial_parser_v1_destroy);
         /* Store flags already */
         mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (port), at_pflags);
+    }
+    /* rpmsg ports... */
+    else if (g_str_equal (subsys, "rpmsg")) {
+        if (ptype == MM_PORT_TYPE_QMI)
+            port = MM_PORT (mm_port_qmi_new (name, MM_PORT_SUBSYS_RPMSG));
+
+        /* Non-serial AT port */
+        if (!port && ptype == MM_PORT_TYPE_AT) {
+            port = MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_RPMSG));
+
+            /* Set common response parser */
+            mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (port),
+                                                   mm_serial_parser_v1_parse,
+                                                   mm_serial_parser_v1_new (),
+                                                   mm_serial_parser_v1_destroy);
+            /* Store flags already */
+            mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (port), at_pflags);
+        }
+
+        if (!port) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_UNSUPPORTED,
+                         "Cannot add port '%s/%s', unsupported",
+                         subsys,
+                         name);
+            g_free (key);
+            return FALSE;
+        }
     }
     else
         /* We already filter out before all non-tty, non-net, non-cdc-wdm ports */
@@ -711,7 +741,17 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
 {
     GList *cdc_wdm_qmi_ports, *l;
     const gchar *net_port_parent_path;
-    MMPortQmi *found = NULL;
+    MMPortQmi *found = NULL, *primary;
+
+    /* FIXME: For RPMSG modems the network interface is not related to the
+     * QMI device, they are managed through completely different subsystems.
+     * For now there should be just one QMI and one net port so we can just
+     * return the primary QMI port.
+     */
+    primary = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    if (primary && mm_port_get_subsys (MM_PORT (primary)) == MM_PORT_SUBSYS_RPMSG)
+            /* Assume there is just one QMI port */
+            return primary;
 
     g_warn_if_fail (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
     net_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (data));
@@ -1239,13 +1279,11 @@ mm_base_modem_organize_ports (MMBaseModem *self,
         secondary = backup_primary ? backup_primary : backup_secondary;
 
 #if defined WITH_QMI
-    /* On QMI-based modems, we need to have at least a net port */
+    /* On QMI-based modems, a net port is required for broadband.
+     * However, all other functionality works without so just warn about this.
+     */
     if (qmi_primary && !data_primary) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Failed to find a net port in the QMI modem");
-        return FALSE;
+        mm_obj_warn (self, "Failed to find a net port in the QMI modem");
     }
 #endif
 

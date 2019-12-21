@@ -532,7 +532,8 @@ mm_port_serial_at_new (const char *name,
 {
     g_return_val_if_fail (subsys == MM_PORT_SUBSYS_TTY ||
                           subsys == MM_PORT_SUBSYS_USB ||
-                          subsys == MM_PORT_SUBSYS_UNIX, NULL);
+                          subsys == MM_PORT_SUBSYS_UNIX ||
+                          subsys == MM_PORT_SUBSYS_RPMSG, NULL);
 
     return MM_PORT_SERIAL_AT (g_object_new (MM_TYPE_PORT_SERIAL_AT,
                                             MM_PORT_DEVICE, name,
